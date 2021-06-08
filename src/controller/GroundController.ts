@@ -47,7 +47,7 @@ export class GroundController {
     const keys: string[] = await redis.keys(params.namespace + '_' + '*');
     const result = [];
     for (const key of keys) {
-      const keyWithoutNs = key.split('_')[1];
+      const keyWithoutNs = key.split('_').slice(1).join('_');
       if (keyWithoutNs === 'seqnum') continue;
       result.push(keyWithoutNs);
     }
