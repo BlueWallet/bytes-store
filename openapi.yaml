@@ -1,0 +1,80 @@
+openapi: 3.0.0
+info:
+  title: bytes-store
+  description: save key-value data
+  version: 1.0.0
+servers:
+  - url: http://localhost:3001
+  - url: https://bytes-store.herokuapp.com
+paths:
+  /namespace/{namespace}/{key}:
+    get:
+      summary: retrive value from a namespace/key
+      parameters:
+        - in: path
+          name: namespace
+          required: true
+          schema:
+            type: string
+          description: unique namespace
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+          description: unique key inside a namespace
+      responses:
+        "200":
+          description: returns stored string KEY in NAMESPACE
+    post:
+      summary: save key to a namespace
+      parameters:
+        - in: path
+          name: namespace
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: any string that needs to be stored
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        "201":
+          description: string saved successfully. returns increased sequence number
+          content:
+            text/plain:
+              schema:
+                type: integer
+                example: 666
+  /namespacekeys/{namespace}:
+    get:
+      summary: retrive all keys from a namespace, comma-separated
+      parameters:
+        - in: path
+          name: namespace
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: returns comma-separated keys
+  /namespaceseq/{namespace}:
+    get:
+      summary: retrive sequence number for a namespace
+      parameters:
+        - in: path
+          name: namespace
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: returns seq num integer
