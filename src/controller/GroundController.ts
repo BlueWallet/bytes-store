@@ -38,7 +38,7 @@ export class GroundController {
 
   async namespaceSeq(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespaceseq$Namespace.Get.PathParameters;
-    const seqnum = await redis.get(params.namespace + '_' + 'seqnum');
+    const seqnum = await redis.get(params.namespace + '_' + 'seqnum') || 0;
     response.status(200).send(seqnum + '');
   }
 
