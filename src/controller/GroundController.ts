@@ -14,7 +14,7 @@ if (!process.env.REDISCLOUD_URL) {
 const redis = new Redis({
   port: parsed.port,
   host: parsed.hostname,
-  password: parsed.auth.split(':')[1],
+  password: parsed.auth.split(":")[1],
 });
 
 redis.info((err, result) => {
@@ -24,34 +24,45 @@ redis.info((err, result) => {
 export class GroundController {
   async namespaceGet(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespace$Namespace$Key.Get.PathParameters;
-    const value = await redis.get(params.namespace + '_' + params.key) || '';
-    response.status(200).send(value + '');
+    const value = (await redis.get(params.namespace + "_" + params.key)) || "";
+    response.status(200).send(value + "");
   }
 
   async namespacePost(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespace$Namespace$Key.Post.PathParameters;
     const body = request.body;
-    await redis.set(params.namespace + '_' + params.key, body);
-    const seqnum = await redis.incr(params.namespace + '_' + 'seqnum');
-    response.status(201).send(seqnum + '');
+    await redis.set(params.namespace + "_" + params.key, body);
+    const seqnum = await redis.incr(params.namespace + "_" + "seqnum");
+    response.status(201).send(seqnum + "");
   }
 
   async namespaceSeq(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespaceseq$Namespace.Get.PathParameters;
-    const seqnum = await redis.get(params.namespace + '_' + 'seqnum') || 0;
-    response.status(200).send(seqnum + '');
+    const seqnum = (await redis.get(params.namespace + "_" + "seqnum")) || 0;
+    response.status(200).send(seqnum + "");
+  }
+
+  async namespaceSize(request: Request, response: Response, next: NextFunction) {
+    const params = (request.params as unknown) as Paths.Namespacesize$Namespace.Get.PathParameters;
+    const keys: string[] = await redis.keys(params.namespace + "_" + "*");
+    let totalSize = 0;
+    for (const key of keys) {
+      const value = await redis.get(key);
+      if (value) totalSize += value.length;
+    }
+    response.status(200).send(totalSize + "");
   }
 
   async namespaceKeys(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespacekeys$Namespace.Get.PathParameters;
-    const keys: string[] = await redis.keys(params.namespace + '_' + '*');
+    const keys: string[] = await redis.keys(params.namespace + "_" + "*");
     const result = [];
     for (const key of keys) {
-      const keyWithoutNs = key.split('_').slice(1).join('_');
-      if (keyWithoutNs === 'seqnum') continue;
+      const keyWithoutNs = key.split("_").slice(1).join("_");
+      if (keyWithoutNs === "seqnum") continue;
       result.push(keyWithoutNs);
     }
-    response.status(200).send(result.join(','));
+    response.status(200).send(result.join(","));
   }
 
   async ping() {

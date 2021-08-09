@@ -61,5 +61,19 @@ declare namespace Paths {
             }
         }
     }
+    namespace Namespacesize$Namespace {
+        namespace Get {
+            namespace Parameters {
+                export type Namespace = string;
+            }
+            export interface PathParameters {
+                namespace: Parameters.Namespace;
+            }
+            namespace Responses {
+                export interface $200 {
+                }
+            }
+        }
+    }
 }
 

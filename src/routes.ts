@@ -27,6 +27,12 @@ export const Routes = [
   },
   {
     method: "get",
+    route: "/namespacesize/:namespace",
+    controller: GroundController,
+    action: "namespaceSize",
+  },
+  {
+    method: "get",
     route: "/ping",
     controller: GroundController,
     action: "ping",

@@ -5,6 +5,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.10",
     "@types/debug": "^4.1.5",
+    "nodemon": "^2.0.12",
     "prettier": "2.0.5",
     "source-map-support": "^0.5.19"
   },
@@ -27,6 +28,7 @@
   "scripts": {
     "postinstall": "./node_modules/.bin/dtsgen openapi.yaml  > src/openapi/api.ts",
     "lint": "npx prettier --write .",
+    "dev": "nodemon --watch \"src/**\" --ext \"ts,json\" --ignore \"src/**/*.spec.ts\" --exec \"ts-node src/index.ts\"",
     "start": "ts-node src/index.ts"
   }
 }

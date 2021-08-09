@@ -78,3 +78,15 @@ paths:
       responses:
         "200":
           description: returns seq num integer
+  /namespacesize/{namespace}:
+    get:
+      summary: retrive byte size of the whole namespace
+      parameters:
+        - in: path
+          name: namespace
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: returns byte size num intege
