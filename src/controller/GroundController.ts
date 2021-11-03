@@ -24,22 +24,37 @@ redis.info((err, result) => {
 export class GroundController {
   async namespaceGet(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespace$Namespace$Key.Get.PathParameters;
-    const value = (await redis.get(params.namespace + "_" + params.key)) || "";
-    response.status(200).send(value + "");
+    try {
+      const value = (await redis.get(params.namespace + "_" + params.key)) || "";
+      response.status(200).send(value + "");
+    } catch (error) {
+      console.error(error.message);
+      response.status(500).send(error.message);
+    }
   }
 
   async namespacePost(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespace$Namespace$Key.Post.PathParameters;
     const body = request.body;
-    await redis.set(params.namespace + "_" + params.key, body);
-    const seqnum = await redis.incr(params.namespace + "_" + "seqnum");
-    response.status(201).send(seqnum + "");
+    try {
+      await redis.set(params.namespace + "_" + params.key, body);
+      const seqnum = await redis.incr(params.namespace + "_" + "seqnum");
+      response.status(201).send(seqnum + "");
+    } catch (error) {
+      console.error(error.message);
+      response.status(500).send(error.message);
+    }
   }
 
   async namespaceSeq(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespaceseq$Namespace.Get.PathParameters;
-    const seqnum = (await redis.get(params.namespace + "_" + "seqnum")) || 0;
-    response.status(200).send(seqnum + "");
+    try {
+      const seqnum = (await redis.get(params.namespace + "_" + "seqnum")) || 0;
+      response.status(200).send(seqnum + "");
+    } catch (error) {
+      console.error(error.message);
+      response.status(500).send(error.message);
+    }
   }
 
   async namespaceSize(request: Request, response: Response, next: NextFunction) {
@@ -55,14 +70,19 @@ export class GroundController {
 
   async namespaceKeys(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespacekeys$Namespace.Get.PathParameters;
-    const keys: string[] = await redis.keys(params.namespace + "_" + "*");
-    const result = [];
-    for (const key of keys) {
-      const keyWithoutNs = key.split("_").slice(1).join("_");
-      if (keyWithoutNs === "seqnum") continue;
-      result.push(keyWithoutNs);
+    try {
+      const keys: string[] = await redis.keys(params.namespace + "_" + "*");
+      const result = [];
+      for (const key of keys) {
+        const keyWithoutNs = key.split("_").slice(1).join("_");
+        if (keyWithoutNs === "seqnum") continue;
+        result.push(keyWithoutNs);
+      }
+      response.status(200).send(result.join(","));
+    } catch (error) {
+      console.error(error.message);
+      response.status(500).send(error.message);
     }
-    response.status(200).send(result.join(","));
   }
 
   async ping() {
