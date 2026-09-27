@@ -1,21 +1,21 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import AES from 'crypto-js/aes';
-import ENCHEX from 'crypto-js/enc-hex';
-import ENCUTF8 from 'crypto-js/enc-utf8';
-import SHA256 from 'crypto-js/sha256';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import AES from "crypto-js/aes";
+import ENCHEX from "crypto-js/enc-hex";
+import ENCUTF8 from "crypto-js/enc-utf8";
+import SHA256 from "crypto-js/sha256";
 
 export default class SyncedAsyncStorage {
-  defaultBaseUrl = 'https://bytes-store.herokuapp.com';
-  encryptionMarker = 'encrypted://';
+  defaultBaseUrl = "https://bytes-store.herokuapp.com";
+  encryptionMarker = "encrypted://";
 
-  namespace: string = '';
-  encryptionKey: string = '';
+  namespace: string = "";
+  encryptionKey: string = "";
 
   constructor(entropy: string) {
-    if (!entropy) throw new Error('entropy not provided');
+    if (!entropy) throw new Error("entropy not provided");
 
-    this.namespace = this.hashIt(this.hashIt('namespace' + entropy));
-    this.encryptionKey = this.hashIt(this.hashIt('encryption' + entropy));
+    this.namespace = this.hashIt(this.hashIt("namespace" + entropy));
+    this.encryptionKey = this.hashIt(this.hashIt("encryption" + entropy));
   }
 
   hashIt(arg: string) {
@@ -27,22 +27,22 @@ export default class SyncedAsyncStorage {
   }
 
   decrypt(encryptedData: string | null, encryptionKey: string | null = null): string {
-    if (encryptedData === null) return '';
+    if (encryptedData === null) return "";
     if (!encryptedData.startsWith(this.encryptionMarker)) return encryptedData;
-    const bytes = AES.decrypt(encryptedData.replace(this.encryptionMarker, ''), encryptionKey || this.encryptionKey);
+    const bytes = AES.decrypt(encryptedData.replace(this.encryptionMarker, ""), encryptionKey || this.encryptionKey);
     return bytes.toString(ENCUTF8);
   }
 
   static assertEquals(a: any, b: any) {
-    if (a !== b) throw new Error('Assertion failed that ' + a + ' equals ' + b);
+    if (a !== b) throw new Error("Assertion failed that " + a + " equals " + b);
   }
 
   static assertNotEquals(a: any, b: any) {
-    if (a === b) throw new Error('Assertion failed that ' + a + ' NOT equals ' + b);
+    if (a === b) throw new Error("Assertion failed that " + a + " NOT equals " + b);
   }
 
   async selftest(): Promise<boolean> {
-    const clear = 'text line to be encrypted';
+    const clear = "text line to be encrypted";
     const encrypted = this.encrypt(clear);
 
     SyncedAsyncStorage.assertEquals(encrypted.startsWith(this.encryptionMarker), true);
@@ -52,13 +52,7 @@ export default class SyncedAsyncStorage {
 
     SyncedAsyncStorage.assertEquals(this.decrypt(clear), clear);
 
-    SyncedAsyncStorage.assertEquals(
-      this.decrypt(
-        'encrypted://U2FsdGVkX19XQWgwS8q5XjQSQ19OmBsNax4k6NZOAsKFhCgw9sJFwb+qVYfqy6X5',
-        '3a013f391e59daf2f5074fa66652784d17511ea072d7a8329ff9bddf371932ab',
-      ),
-      'text line to be encrypted',
-    );
+    SyncedAsyncStorage.assertEquals(this.decrypt("encrypted://U2FsdGVkX19XQWgwS8q5XjQSQ19OmBsNax4k6NZOAsKFhCgw9sJFwb+qVYfqy6X5", "3a013f391e59daf2f5074fa66652784d17511ea072d7a8329ff9bddf371932ab"), "text line to be encrypted");
 
     return true;
   }
@@ -72,17 +66,17 @@ export default class SyncedAsyncStorage {
   async setItemRemote(key: string, value: string): Promise<string> {
     const that = this;
     return new Promise(function (resolve, reject) {
-      fetch(that.defaultBaseUrl + '/namespace/' + that.namespace + '/' + key, {
-        method: 'POST',
+      fetch(that.defaultBaseUrl + "/namespace/" + that.namespace + "/" + key, {
+        method: "POST",
         headers: {
-          Accept: 'text/plain',
-          'Content-Type': 'text/plain',
+          Accept: "text/plain",
+          "Content-Type": "text/plain",
         },
         body: value,
       })
-        .then(async response => {
+        .then(async (response) => {
           const text = await response.text();
-          console.log('saved, seq num:', text);
+          console.log("saved, seq num:", text);
           resolve(text);
         })
         .catch((reason: Error) => reject(reason));
@@ -91,44 +85,42 @@ export default class SyncedAsyncStorage {
 
   async setItem(key: string, value: string) {
     value = this.encrypt(value);
-    await AsyncStorage.setItem(this.namespace + '_' + key, value);
+    await AsyncStorage.setItem(this.namespace + "_" + key, value);
     const newSeqNum = await this.setItemRemote(key, value);
     const localSeqNum = await this.getLocalSeqNum();
     if (+localSeqNum > +newSeqNum) {
       // some race condition during save happened..?
       return;
     }
-    await AsyncStorage.setItem(this.namespace + '_' + 'seqnum', newSeqNum);
+    await AsyncStorage.setItem(this.namespace + "_" + "seqnum", newSeqNum);
   }
 
   async getItemRemote(key: string) {
-    const response = await fetch(this.defaultBaseUrl + '/namespace/' + this.namespace + '/' + key);
+    const response = await fetch(this.defaultBaseUrl + "/namespace/" + this.namespace + "/" + key);
     return await response.text();
   }
 
   async getItem(key: string) {
-    return this.decrypt(await AsyncStorage.getItem(this.namespace + '_' + key));
+    return this.decrypt(await AsyncStorage.getItem(this.namespace + "_" + key));
   }
 
   async getAllKeysRemote(): Promise<string[]> {
-    const response = await fetch(this.defaultBaseUrl + '/namespacekeys/' + this.namespace);
+    const response = await fetch(this.defaultBaseUrl + "/namespacekeys/" + this.namespace);
     const text = await response.text();
-    return text.split(',');
+    return text.split(",");
   }
 
   async getAllKeys(): Promise<string[]> {
-    return (await AsyncStorage.getAllKeys())
-      .filter(key => key.startsWith(this.namespace + '_'))
-      .map(key => key.replace(this.namespace + '_', ''));
+    return (await AsyncStorage.getAllKeys()).filter((key) => key.startsWith(this.namespace + "_")).map((key) => key.replace(this.namespace + "_", ""));
   }
 
   async getLocalSeqNum() {
-    return (await AsyncStorage.getItem(this.namespace + '_' + 'seqnum')) || '0';
+    return (await AsyncStorage.getItem(this.namespace + "_" + "seqnum")) || "0";
   }
 
   async purgeLocalStorage() {
-    if (!this.namespace) throw new Error('No namespace');
-    const keys = (await AsyncStorage.getAllKeys()).filter(key => key.startsWith(this.namespace));
+    if (!this.namespace) throw new Error("No namespace");
+    const keys = (await AsyncStorage.getAllKeys()).filter((key) => key.startsWith(this.namespace));
     for (const key of keys) {
       await AsyncStorage.removeItem(key);
     }
@@ -139,22 +131,22 @@ export default class SyncedAsyncStorage {
    * Checks remote sequence number, and if remote is ahead - we sync all keys with local storage.
    */
   async synchronize() {
-    const response = await fetch(this.defaultBaseUrl + '/namespaceseq/' + this.namespace);
-    const remoteSeqNum = (await response.text()) || '0';
+    const response = await fetch(this.defaultBaseUrl + "/namespaceseq/" + this.namespace);
+    const remoteSeqNum = (await response.text()) || "0";
     const localSeqNum = await this.getLocalSeqNum();
     if (+remoteSeqNum > +localSeqNum) {
-      console.log('remote storage is ahead, need to sync;', +remoteSeqNum, '>', +localSeqNum);
+      console.log("remote storage is ahead, need to sync;", +remoteSeqNum, ">", +localSeqNum);
 
       // sort to ensure channel_manager comes first
       for (const key of (await this.getAllKeysRemote()).sort()) {
         const value = await this.getItemRemote(key);
-        await AsyncStorage.setItem(this.namespace + '_' + key, value);
-        console.log('synced', key, 'to', value);
+        await AsyncStorage.setItem(this.namespace + "_" + key, value);
+        console.log("synced", key, "to", value);
       }
 
-      await AsyncStorage.setItem(this.namespace + '_' + 'seqnum', remoteSeqNum);
+      await AsyncStorage.setItem(this.namespace + "_" + "seqnum", remoteSeqNum);
     } else {
-      console.log('storage is up-to-date, no need for sync');
+      console.log("storage is up-to-date, no need for sync");
     }
   }
 }
