@@ -25,7 +25,9 @@
   },
   "scripts": {
     "postinstall": "./node_modules/.bin/dtsgen openapi.yaml  > src/openapi/api.ts",
-    "lint": "bunx prettier --write .",
+    "lint": "prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts"
   }

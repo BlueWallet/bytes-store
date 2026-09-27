@@ -42,9 +42,7 @@ db.exec(`
   );
 `);
 
-const getValue = db.query<{ value: Uint8Array }, [string, string]>(
-  "SELECT value FROM entries WHERE namespace = ? AND key = ?"
-);
+const getValue = db.query<{ value: Uint8Array }, [string, string]>("SELECT value FROM entries WHERE namespace = ? AND key = ?");
 const readSeq = db.query<{ seq: number }, [string]>("SELECT seq FROM sequences WHERE namespace = ?");
 const bumpSeq = db.query<{ seq: number }, [string]>(
   `INSERT INTO sequences (namespace, seq) VALUES (?, 1)
@@ -55,9 +53,7 @@ const upsertValue = db.query(
   `INSERT INTO entries (namespace, key, value) VALUES (?, ?, ?)
    ON CONFLICT(namespace, key) DO UPDATE SET value = excluded.value`
 );
-const sumSize = db.query<{ total: number }, [string]>(
-  "SELECT COALESCE(SUM(length(value)), 0) AS total FROM entries WHERE namespace = ?"
-);
+const sumSize = db.query<{ total: number }, [string]>("SELECT COALESCE(SUM(length(value)), 0) AS total FROM entries WHERE namespace = ?");
 const listKeys = db.query<{ key: string }, [string]>("SELECT key FROM entries WHERE namespace = ?");
 
 function asString(value: Uint8Array | null): string {
