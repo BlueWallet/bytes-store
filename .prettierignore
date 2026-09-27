@@ -1,4 +1,5 @@
 node_modules
 build
+coverage
 bun.lock
 src/openapi/api.ts
