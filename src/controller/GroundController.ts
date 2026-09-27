@@ -1,32 +1,81 @@
 import "../openapi/api";
 import { NextFunction, Request, Response } from "express";
+import { Database } from "bun:sqlite";
 require("dotenv").config();
 const pck = require("../../package.json");
-const Redis = require("ioredis");
 
-const url = require("url");
-const parsed = url.parse(process.env.REDISCLOUD_URL);
-if (!process.env.REDISCLOUD_URL) {
-  console.error("not all env variables set");
-  process.exit();
+const db = new Database(process.env.DB_PATH || "bytes.sqlite", { create: true });
+
+const entryColumns = db.query<{ name: string }, []>("PRAGMA table_info(entries)").all();
+if (entryColumns.some((column) => column.name === "seq")) {
+  db.exec(`
+    CREATE TABLE entries_next (
+      namespace TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value BLOB NOT NULL,
+      PRIMARY KEY (namespace, key)
+    );
+    INSERT INTO entries_next (namespace, key, value)
+      SELECT namespace, key, value FROM entries;
+    CREATE TABLE IF NOT EXISTS sequences (
+      namespace TEXT PRIMARY KEY,
+      seq INTEGER NOT NULL
+    );
+    INSERT INTO sequences (namespace, seq)
+      SELECT namespace, MAX(seq) FROM entries GROUP BY namespace
+      ON CONFLICT(namespace) DO UPDATE SET seq = excluded.seq;
+    DROP TABLE entries;
+    ALTER TABLE entries_next RENAME TO entries;
+  `);
 }
 
-const redis = new Redis({
-  port: parsed.port,
-  host: parsed.hostname,
-  password: parsed.auth.split(":")[1],
-});
+db.exec(`
+  CREATE TABLE IF NOT EXISTS entries (
+    namespace TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value BLOB NOT NULL,
+    PRIMARY KEY (namespace, key)
+  );
+  CREATE TABLE IF NOT EXISTS sequences (
+    namespace TEXT PRIMARY KEY,
+    seq INTEGER NOT NULL
+  );
+`);
 
-redis.info((err, result) => {
-  // console.warn(result);
-});
+const getValue = db.query<{ value: Uint8Array }, [string, string]>(
+  "SELECT value FROM entries WHERE namespace = ? AND key = ?"
+);
+const readSeq = db.query<{ seq: number }, [string]>("SELECT seq FROM sequences WHERE namespace = ?");
+const bumpSeq = db.query<{ seq: number }, [string]>(
+  `INSERT INTO sequences (namespace, seq) VALUES (?, 1)
+   ON CONFLICT(namespace) DO UPDATE SET seq = seq + 1
+   RETURNING seq`
+);
+const upsertValue = db.query(
+  `INSERT INTO entries (namespace, key, value) VALUES (?, ?, ?)
+   ON CONFLICT(namespace, key) DO UPDATE SET value = excluded.value`
+);
+const sumSize = db.query<{ total: number }, [string]>(
+  "SELECT COALESCE(SUM(length(value)), 0) AS total FROM entries WHERE namespace = ?"
+);
+const listKeys = db.query<{ key: string }, [string]>("SELECT key FROM entries WHERE namespace = ?");
+
+function asString(value: Uint8Array | null): string {
+  if (!value) return "";
+  return Buffer.from(value).toString("utf8");
+}
 
 export class GroundController {
   async namespaceGet(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespace$Namespace$Key.Get.PathParameters;
     try {
-      const value = (await redis.get(params.namespace + "_" + params.key)) || "";
-      response.status(200).send(value + "");
+      if (params.key === "seqnum") {
+        const row = readSeq.get(params.namespace);
+        response.status(200).send(String(row?.seq ?? 0));
+        return;
+      }
+      const row = getValue.get(params.namespace, params.key);
+      response.status(200).send(asString(row?.value ?? null));
     } catch (error) {
       console.error(error.message);
       response.status(500).send(error.message);
@@ -36,10 +85,17 @@ export class GroundController {
   async namespacePost(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespace$Namespace$Key.Post.PathParameters;
     const body = request.body;
+    if (params.key === "seqnum") {
+      response.status(400).send("seqnum is reserved");
+      return;
+    }
     try {
-      await redis.set(params.namespace + "_" + params.key, body);
-      const seqnum = await redis.incr(params.namespace + "_" + "seqnum");
-      response.status(201).send(seqnum + "");
+      const bytes = Buffer.from(typeof body === "string" ? body : String(body ?? ""), "utf8");
+      const write = db.transaction(() => {
+        upsertValue.run(params.namespace, params.key, bytes);
+        return bumpSeq.get(params.namespace).seq;
+      });
+      response.status(201).send(String(write()));
     } catch (error) {
       console.error(error.message);
       response.status(500).send(error.message);
@@ -49,8 +105,8 @@ export class GroundController {
   async namespaceSeq(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespaceseq$Namespace.Get.PathParameters;
     try {
-      const seqnum = (await redis.get(params.namespace + "_" + "seqnum")) || 0;
-      response.status(200).send(seqnum + "");
+      const row = readSeq.get(params.namespace);
+      response.status(200).send(String(row?.seq ?? 0));
     } catch (error) {
       console.error(error.message);
       response.status(500).send(error.message);
@@ -59,26 +115,17 @@ export class GroundController {
 
   async namespaceSize(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespacesize$Namespace.Get.PathParameters;
-    const keys: string[] = await redis.keys(params.namespace + "_" + "*");
-    let totalSize = 0;
-    for (const key of keys) {
-      const value = await redis.get(key);
-      if (value) totalSize += value.length;
-    }
-    response.status(200).send(totalSize + "");
+    const stored = sumSize.get(params.namespace)?.total ?? 0;
+    const seq = readSeq.get(params.namespace)?.seq ?? 0;
+    const seqBytes = seq === 0 ? 0 : Buffer.byteLength(String(seq));
+    response.status(200).send(String(stored + seqBytes));
   }
 
   async namespaceKeys(request: Request, response: Response, next: NextFunction) {
     const params = (request.params as unknown) as Paths.Namespacekeys$Namespace.Get.PathParameters;
     try {
-      const keys: string[] = await redis.keys(params.namespace + "_" + "*");
-      const result = [];
-      for (const key of keys) {
-        const keyWithoutNs = key.split("_").slice(1).join("_");
-        if (keyWithoutNs === "seqnum") continue;
-        result.push(keyWithoutNs);
-      }
-      response.status(200).send(result.join(","));
+      const keys = listKeys.all(params.namespace).map((row) => row.key);
+      response.status(200).send(keys.join(","));
     } catch (error) {
       console.error(error.message);
       response.status(500).send(error.message);
