@@ -3,17 +3,18 @@
 ### Installation
 
 ```shell script
-npm i
-npm start
+bun install
+bun start
 ```
 
-Works well on Heroku (you'll need `Redis` addon)
+One SQLite file (`bytes.sqlite` by default). `entries` holds `namespace`, `key`, and a `BLOB` value. `sequences` holds the namespace-to-counter relation, with `seq` as an `INTEGER`.
 
 ### Environment variables
 
 Set them as env variables or put them into `.env` file in project root dir.
 
-- `REDISCLOUD`
+- `PORT` — HTTP port (default `3001`)
+- `DB_PATH` — SQLite file path (default `bytes.sqlite`)
 
 ### OpenAPI
 
