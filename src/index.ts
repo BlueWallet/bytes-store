@@ -8,7 +8,8 @@ const cors = require("cors");
 
 // create express app
 const app = express();
-app.set("trust proxy", 1);
+const proxyHops = Number(process.env.TRUST_PROXY);
+if (proxyHops > 0) app.set("trust proxy", proxyHops);
 app.use(bodyParser.text());
 app.use(cors());
 const rateLimit = require("express-rate-limit");

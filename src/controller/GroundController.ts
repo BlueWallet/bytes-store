@@ -6,29 +6,6 @@ const pck = require("../../package.json");
 
 const db = new Database(process.env.DB_PATH || "bytes.sqlite", { create: true });
 
-const entryColumns = db.query<{ name: string }, []>("PRAGMA table_info(entries)").all();
-if (entryColumns.some((column) => column.name === "seq")) {
-  db.exec(`
-    CREATE TABLE entries_next (
-      namespace TEXT NOT NULL,
-      key TEXT NOT NULL,
-      value BLOB NOT NULL,
-      PRIMARY KEY (namespace, key)
-    );
-    INSERT INTO entries_next (namespace, key, value)
-      SELECT namespace, key, value FROM entries;
-    CREATE TABLE IF NOT EXISTS sequences (
-      namespace TEXT PRIMARY KEY,
-      seq INTEGER NOT NULL
-    );
-    INSERT INTO sequences (namespace, seq)
-      SELECT namespace, MAX(seq) FROM entries GROUP BY namespace
-      ON CONFLICT(namespace) DO UPDATE SET seq = excluded.seq;
-    DROP TABLE entries;
-    ALTER TABLE entries_next RENAME TO entries;
-  `);
-}
-
 db.exec(`
   CREATE TABLE IF NOT EXISTS entries (
     namespace TEXT NOT NULL,
@@ -85,8 +62,12 @@ export class GroundController {
       response.status(400).send("seqnum is reserved");
       return;
     }
+    if (typeof body !== "string") {
+      response.status(400).send("body must be text/plain");
+      return;
+    }
     try {
-      const bytes = Buffer.from(typeof body === "string" ? body : String(body ?? ""), "utf8");
+      const bytes = Buffer.from(body, "utf8");
       const write = db.transaction(() => {
         upsertValue.run(params.namespace, params.key, bytes);
         return bumpSeq.get(params.namespace).seq;
