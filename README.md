@@ -15,6 +15,7 @@ Set them as env variables or put them into `.env` file in project root dir.
 
 - `PORT` — HTTP port (default `3001`)
 - `DB_PATH` — SQLite file path (default `bytes.sqlite`)
+- `TRUST_PROXY` — hop count to trust for `X-Forwarded-For` (unset means the limiter uses the socket address)
 
 ### OpenAPI
 
