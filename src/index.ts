@@ -8,8 +8,15 @@ const cors = require("cors");
 
 // create express app
 const app = express();
+app.set("trust proxy", 1);
 app.use(bodyParser.text());
 app.use(cors());
+const rateLimit = require("express-rate-limit");
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1500,
+});
+app.use(limiter);
 
 // register express routes from defined application routes
 Routes.forEach((route) => {
@@ -22,14 +29,6 @@ Routes.forEach((route) => {
     }
   });
 });
-
-app.set("trust proxy", 1);
-const rateLimit = require("express-rate-limit");
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 1500,
-});
-app.use(limiter);
 
 app.listen(process.env.PORT || 3001);
 
